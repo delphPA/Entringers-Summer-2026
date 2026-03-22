@@ -216,6 +216,44 @@ body{font-family:"Outfit",sans-serif;background:var(--warm);color:var(--ink);ove
   .pill{font-size:8.5px;padding:2px 6px}
   .tl-grid{grid-template-columns:1fr 1fr}.book-grid{grid-template-columns:1fr}
 }
+
+/* ── LOCK OVERLAY ── */
+.lock-overlay{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:340px;gap:20px;padding:40px 20px;
+  animation:fadeIn .3s ease;
+}
+.lock-icon{font-size:52px;margin-bottom:4px}
+.lock-title{font-family:"Cormorant Garamond",serif;font-size:28px;font-weight:400;color:var(--navy)}
+.lock-sub{font-size:13px;color:rgba(28,23,16,.45);text-align:center;max-width:320px;line-height:1.6}
+.lock-form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.lock-input{
+  border:2px solid rgba(28,23,16,.15);border-radius:100px;
+  padding:11px 22px;font-family:"Outfit",sans-serif;font-size:14px;
+  color:var(--ink);background:var(--cream);outline:none;
+  text-align:center;letter-spacing:3px;width:200px;
+  transition:border-color .2s;
+}
+.lock-input:focus{border-color:var(--gold)}
+.lock-submit{
+  background:var(--navy);color:var(--cream);border:none;
+  border-radius:100px;padding:11px 28px;
+  font-family:"Outfit",sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;transition:background .2s;
+}
+.lock-submit:hover{background:var(--sea2)}
+.lock-error{
+  font-size:12px;font-weight:600;color:var(--rust);
+  background:rgba(196,92,46,.1);border-radius:100px;
+  padding:6px 18px;display:none;
+}
+.lock-error.show{display:block}
+.lock-logout{
+  font-size:11px;color:rgba(28,23,16,.3);background:none;border:none;
+  cursor:pointer;text-decoration:underline;margin-top:8px;
+  font-family:"Outfit",sans-serif;
+}
+.lock-logout:hover{color:var(--rust)}
 </style>
 </head>
 <body>
@@ -244,7 +282,7 @@ body{font-family:"Outfit",sans-serif;background:var(--warm);color:var(--ink);ove
 <div class="nav">
   <button class="nav-btn active" onclick="showView('calendar',this)">📅 Calendar</button>
   <button class="nav-btn" onclick="showView('timeline',this)">🗺️ Trip Timeline</button>
-  <button class="nav-btn" onclick="showView('bookings',this)">📋 Bookings &amp; Costs</button>
+  <button class="nav-btn" onclick="showBookings(this)">📋 Bookings &amp; Costs 🔒</button>
 </div>
 
 <div class="main">
@@ -390,11 +428,84 @@ body{font-family:"Outfit",sans-serif;background:var(--warm);color:var(--ink);ove
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── NAV ──
+// Simple hash function for password check (no plain-text passwords in source)
+function simpleHash(str) {
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash.toString();
+}
+// Hash of the access code — change 'entringer2026' to your chosen password
+// then replace the hash value below with: simpleHash('yournewpassword')
+var BOOKINGS_HASH = simpleHash('entringer2026'); // = "-1438916575"
+
+function isBookingsUnlocked() {
+  return sessionStorage.getItem('bk_unlocked') === BOOKINGS_HASH;
+}
+
 function showView(name, btn) {
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('view-'+name).classList.add('active');
   btn.classList.add('active');
+}
+
+function showBookings(btn) {
+  if (isBookingsUnlocked()) {
+    showView('bookings', btn);
+  } else {
+    // Show bookings view with lock screen instead
+    document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+    document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
+    document.getElementById('view-bookings').classList.add('active');
+    btn.classList.add('active');
+    renderLockScreen();
+  }
+}
+
+function renderLockScreen() {
+  var view = document.getElementById('view-bookings');
+  // Only render if not already showing the lock screen
+  if (view.querySelector('.lock-overlay')) return;
+  // Hide real content
+  view.querySelectorAll('.plan-section').forEach(function(s){s.style.display='none';});
+  // Build lock overlay
+  var lock = document.createElement('div');
+  lock.className = 'lock-overlay';
+  lock.id = 'lockOverlay';
+  lock.innerHTML = '<div class="lock-icon">🔒</div>'
+    + '<div class="lock-title">Restricted Access</div>'
+    + '<div class="lock-sub">This section contains booking details and costs. Please enter the access code to continue.</div>'
+    + '<div class="lock-form">'
+    +   '<input class="lock-input" id="lockInput" type="password" placeholder="Access code" autocomplete="off">'
+    +   '<button class="lock-submit" onclick="checkCode()">Unlock</button>'
+    + '</div>'
+    + '<div class="lock-error" id="lockError">Incorrect code — try again</div>';
+  view.insertBefore(lock, view.firstChild);
+  setTimeout(function(){ document.getElementById('lockInput').focus(); }, 100);
+  document.getElementById('lockInput').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') checkCode();
+  });
+}
+
+function checkCode() {
+  var input = document.getElementById('lockInput');
+  var error = document.getElementById('lockError');
+  if (simpleHash(input.value.trim()) === BOOKINGS_HASH) {
+    sessionStorage.setItem('bk_unlocked', BOOKINGS_HASH);
+    // Remove lock screen, show real content
+    var overlay = document.getElementById('lockOverlay');
+    if (overlay) overlay.remove();
+    document.getElementById('view-bookings').querySelectorAll('.plan-section').forEach(function(s){
+      s.style.display='';
+    });
+  } else {
+    input.value = '';
+    error.classList.add('show');
+    setTimeout(function(){ error.classList.remove('show'); }, 3000);
+  }
 }
 
 // ── PACKING ──
