@@ -427,107 +427,92 @@ body{font-family:"Outfit",sans-serif;background:var(--warm);color:var(--ink);ove
 <div class="footer">☀️ The Entringer Family · Summer 2026 ☀️</div>
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-// ── NAV ──
-// Simple hash function for password check (no plain-text passwords in source)
-function simpleHash(str) {
-  var hash = 0;
-  for (var i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash.toString();
-}
-// Hash of the access code — change 'entringer2026' to your chosen password
-// then replace the hash value below with: simpleHash('yournewpassword')
-var BOOKINGS_HASH = simpleHash('entringer2026'); // = "-1438916575"
+/* ═══════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════ */
+function simpleHash(s){var h=0;for(var i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}return h.toString();}
+var BOOKINGS_HASH = simpleHash('entringer2026');
+function isUnlocked(){return sessionStorage.getItem('bk_ok')===BOOKINGS_HASH;}
 
-function isBookingsUnlocked() {
-  return sessionStorage.getItem('bk_unlocked') === BOOKINGS_HASH;
-}
-
-function showView(name, btn) {
+/* ═══════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════ */
+function showView(name,btn){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('view-'+name).classList.add('active');
   btn.classList.add('active');
 }
-
-function showBookings(btn) {
-  if (isBookingsUnlocked()) {
-    showView('bookings', btn);
-  } else {
-    // Show bookings view with lock screen instead
+function showBookings(btn){
+  if(isUnlocked()){showView('bookings',btn);}
+  else{
     document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
     document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
     document.getElementById('view-bookings').classList.add('active');
     btn.classList.add('active');
-    renderLockScreen();
+    renderLock();
+  }
+}
+function renderLock(){
+  var v=document.getElementById('view-bookings');
+  if(v.querySelector('.lock-overlay'))return;
+  v.querySelectorAll('.plan-section').forEach(function(s){s.style.display='none';});
+  var d=document.createElement('div');d.className='lock-overlay';d.id='lockOL';
+  d.innerHTML='<div class="lock-icon">&#x1F512;</div>'
+    +'<div class="lock-title">Restricted Access</div>'
+    +'<div class="lock-sub">Enter the access code to view booking details.</div>'
+    +'<div class="lock-form"><input class="lock-input" id="lkInp" type="password" placeholder="Access code" autocomplete="off">'
+    +'<button class="lock-submit" id="lkBtn">Unlock</button></div>'
+    +'<div class="lock-error" id="lkErr" style="display:none">Incorrect code — try again</div>';
+  v.insertBefore(d,v.firstChild);
+  document.getElementById('lkBtn').onclick=checkCode;
+  document.getElementById('lkInp').onkeydown=function(e){if(e.key==='Enter')checkCode();};
+  setTimeout(function(){document.getElementById('lkInp').focus();},80);
+}
+function checkCode(){
+  var i=document.getElementById('lkInp'),er=document.getElementById('lkErr');
+  if(simpleHash(i.value.trim())===BOOKINGS_HASH){
+    sessionStorage.setItem('bk_ok',BOOKINGS_HASH);
+    var ol=document.getElementById('lockOL');if(ol)ol.remove();
+    document.getElementById('view-bookings').querySelectorAll('.plan-section').forEach(function(s){s.style.display='';});
+  }else{
+    i.value='';er.style.display='block';
+    setTimeout(function(){er.style.display='none';},3000);
   }
 }
 
-function renderLockScreen() {
-  var view = document.getElementById('view-bookings');
-  // Only render if not already showing the lock screen
-  if (view.querySelector('.lock-overlay')) return;
-  // Hide real content
-  view.querySelectorAll('.plan-section').forEach(function(s){s.style.display='none';});
-  // Build lock overlay
-  var lock = document.createElement('div');
-  lock.className = 'lock-overlay';
-  lock.id = 'lockOverlay';
-  lock.innerHTML = '<div class="lock-icon">🔒</div>'
-    + '<div class="lock-title">Restricted Access</div>'
-    + '<div class="lock-sub">This section contains booking details and costs. Please enter the access code to continue.</div>'
-    + '<div class="lock-form">'
-    +   '<input class="lock-input" id="lockInput" type="password" placeholder="Access code" autocomplete="off">'
-    +   '<button class="lock-submit" onclick="checkCode()">Unlock</button>'
-    + '</div>'
-    + '<div class="lock-error" id="lockError">Incorrect code — try again</div>';
-  view.insertBefore(lock, view.firstChild);
-  setTimeout(function(){ document.getElementById('lockInput').focus(); }, 100);
-  document.getElementById('lockInput').addEventListener('keydown', function(e){
-    if (e.key === 'Enter') checkCode();
-  });
+/* ═══════════════════════════════════════════
+   PACKING
+═══════════════════════════════════════════ */
+function togglePack(btn){
+  var p=btn.nextElementSibling;p.classList.toggle('open');
+  btn.textContent=p.classList.contains('open')?'\u25b2 Hide list':'\uD83C\uDF92 Packing list';
 }
 
-function checkCode() {
-  var input = document.getElementById('lockInput');
-  var error = document.getElementById('lockError');
-  if (simpleHash(input.value.trim()) === BOOKINGS_HASH) {
-    sessionStorage.setItem('bk_unlocked', BOOKINGS_HASH);
-    // Remove lock screen, show real content
-    var overlay = document.getElementById('lockOverlay');
-    if (overlay) overlay.remove();
-    document.getElementById('view-bookings').querySelectorAll('.plan-section').forEach(function(s){
-      s.style.display='';
-    });
-  } else {
-    input.value = '';
-    error.classList.add('show');
-    setTimeout(function(){ error.classList.remove('show'); }, 3000);
-  }
-}
+/* ═══════════════════════════════════════════
+   CALENDAR DATA
+═══════════════════════════════════════════ */
+var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-// ── PACKING ──
-function togglePack(btn) {
-  var p = btn.nextElementSibling;
-  p.classList.toggle('open');
-  btn.textContent = p.classList.contains('open') ? '▲ Hide list' : '🎒 ' + btn.textContent.replace('▲ Hide list','').replace(/^🎒 /,'');
-}
+/* Known values: internal key + display label + CSS class */
+var ACTIVITIES=[
+  {k:'',         lbl:'\u2014 empty \u2014',     cls:''},
+  {k:'Travel',   lbl:'\u2708\uFE0F Travel',      cls:'p-travel'},
+  {k:'Lux',      lbl:'Luxembourg',               cls:'p-lux'},
+  {k:'Belgium',  lbl:'Belgium \uD83C\uDDE7\uD83C\uDDEA', cls:'p-bel'},
+  {k:'Croatia',  lbl:'Croatia \uD83C\uDDED\uD83C\uDDF7', cls:'p-cro'},
+  {k:'Cannes',   lbl:'Cannes \u2600\uFE0F',      cls:'p-can'},
+  {k:'Mamie Cannes', lbl:'Mamie \uD83D\uDC75',   cls:'p-mam'},
+  {k:'Friends',  lbl:'Friends \uD83D\uDC6F',     cls:'p-fri'},
+  {k:'Car \uD83D\uDE97', lbl:'Car \uD83D\uDE97', cls:'p-car'},
+  {k:'P\u00E9lagos', lbl:'P\u00E9lagos \uD83E\uDD3F', cls:'p-pel'},
+  {k:'Wild Trip',lbl:'Wild Trip \u26F0\uFE0F',   cls:'p-wild'},
+  {k:'\u00CEle de L\u00E9rins', lbl:'\u00CEle L\u00E9rins \u26F5', cls:'p-ler'},
+  {k:'Sailing',  lbl:'Sailing \u26F5',            cls:'p-sail'},
+  {k:'Soccer Camp', lbl:'Soccer \u26BD',          cls:'p-soc'}
+];
 
-// ── CALENDAR DATA ──
-var DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-var KNOWN = ['','Travel','Lux','Belgium','Croatia','Cannes','Mamie Cannes','Friends','Car 🚗','Pélagos','Wild Trip','Île de Lérins','Sailing','Soccer Camp'];
-var PM = {
-  'Travel':['p-travel','✈️ Travel'],'Lux':['p-lux','Luxembourg'],
-  'Belgium':['p-bel','Belgium 🇧🇪'],'Croatia':['p-cro','Croatia 🇭🇷'],
-  'Cannes':['p-can','Cannes ☀️'],'Mamie Cannes':['p-mam','Mamie 👵'],
-  'Friends':['p-fri','Friends 👯'],'Car 🚗':['p-car','Car 🚗'],
-  'Pélagos':['p-pel','Pélagos 🤿'],'Wild Trip':['p-wild','Wild Trip 🏔️'],
-  'Île de Lérins':['p-ler','Île Lérins ⛵'],'Sailing':['p-sail','Sailing ⛵'],
-  'Soccer Camp':['p-soc','Soccer ⚽']
-};
-var DEFAULT_CAL = [
+var DEFAULT_CAL=[
   ['2026-06-10','Travel','Travel','Travel','Travel'],
   ['2026-06-11','Travel','Travel','Travel','Travel'],
   ['2026-06-12','Lux','Belgium','Belgium','Belgium'],
@@ -544,7 +529,7 @@ var DEFAULT_CAL = [
   ['2026-06-23','Croatia','Croatia','Croatia','Croatia'],
   ['2026-06-24','Croatia','Croatia','Croatia','Croatia'],
   ['2026-06-25','Croatia','Travel','Travel','Travel'],
-  ['2026-06-26','Lux','Car 🚗','Belgium','Belgium'],
+  ['2026-06-26','Lux','Car \uD83D\uDE97','Belgium','Belgium'],
   ['2026-06-27','Lux','Friends','Belgium','Belgium'],
   ['2026-06-28','Lux','Friends','Belgium','Belgium'],
   ['2026-06-29','Lux','Travel','Travel','Travel'],
@@ -554,11 +539,11 @@ var DEFAULT_CAL = [
   ['2026-07-03','Lux','Mamie Cannes','Cannes','Cannes'],
   ['2026-07-04','Cannes','Mamie Cannes','Cannes','Cannes'],
   ['2026-07-05','Cannes','Mamie Cannes','Cannes','Cannes'],
-  ['2026-07-06','','Mamie Cannes','Pélagos','Pélagos'],
-  ['2026-07-07','','Mamie Cannes','Pélagos','Pélagos'],
-  ['2026-07-08','','Mamie Cannes','Pélagos','Pélagos'],
-  ['2026-07-09','','Mamie Cannes','Pélagos','Pélagos'],
-  ['2026-07-10','Cannes','Cannes','Pélagos','Pélagos'],
+  ['2026-07-06','','Mamie Cannes','P\u00E9lagos','P\u00E9lagos'],
+  ['2026-07-07','','Mamie Cannes','P\u00E9lagos','P\u00E9lagos'],
+  ['2026-07-08','','Mamie Cannes','P\u00E9lagos','P\u00E9lagos'],
+  ['2026-07-09','','Mamie Cannes','P\u00E9lagos','P\u00E9lagos'],
+  ['2026-07-10','Cannes','Cannes','P\u00E9lagos','P\u00E9lagos'],
   ['2026-07-11','Cannes','Cannes','Cannes','Cannes'],
   ['2026-07-12','Cannes','Cannes','Cannes','Cannes'],
   ['2026-07-13','Cannes','Cannes','Wild Trip','Wild Trip'],
@@ -568,11 +553,11 @@ var DEFAULT_CAL = [
   ['2026-07-17','Cannes','Cannes','Wild Trip','Wild Trip'],
   ['2026-07-18','Cannes','Cannes','Cannes','Cannes'],
   ['2026-07-19','Cannes','Cannes','Cannes','Cannes'],
-  ['2026-07-20','Cannes','Cannes','Île de Lérins','Île de Lérins'],
-  ['2026-07-21','Cannes','Cannes','Île de Lérins','Île de Lérins'],
-  ['2026-07-22','Cannes','Cannes','Île de Lérins','Île de Lérins'],
-  ['2026-07-23','Cannes','Cannes','Île de Lérins','Île de Lérins'],
-  ['2026-07-24','Cannes','Cannes','Île de Lérins','Île de Lérins'],
+  ['2026-07-20','Cannes','Cannes','\u00CEle de L\u00E9rins','\u00CEle de L\u00E9rins'],
+  ['2026-07-21','Cannes','Cannes','\u00CEle de L\u00E9rins','\u00CEle de L\u00E9rins'],
+  ['2026-07-22','Cannes','Cannes','\u00CEle de L\u00E9rins','\u00CEle de L\u00E9rins'],
+  ['2026-07-23','Cannes','Cannes','\u00CEle de L\u00E9rins','\u00CEle de L\u00E9rins'],
+  ['2026-07-24','Cannes','Cannes','\u00CEle de L\u00E9rins','\u00CEle de L\u00E9rins'],
   ['2026-07-25','Cannes','Cannes','Cannes','Cannes'],
   ['2026-07-26','Cannes','Cannes','Cannes','Cannes'],
   ['2026-07-27','Cannes','Cannes','Sailing','Sailing'],
@@ -590,190 +575,234 @@ var DEFAULT_CAL = [
   ['2026-08-17','Travel','Travel','Travel','Travel']
 ];
 
-var CAL_VER = 'v5';
-function loadCAL() {
-  try {
-    if (localStorage.getItem('ecal_ver') === CAL_VER) {
-      var s = localStorage.getItem('ecal_data');
-      if (s) return JSON.parse(s);
+var CAL_VER='v7';
+function loadCAL(){
+  try{
+    if(localStorage.getItem('ecal_ver')===CAL_VER){
+      var s=localStorage.getItem('ecal_data');
+      if(s)return JSON.parse(s);
     }
-  } catch(e) {}
+  }catch(e){}
   return DEFAULT_CAL.map(function(r){return r.slice();});
 }
-function saveCAL() {
-  try {
-    localStorage.setItem('ecal_data', JSON.stringify(CAL));
-    localStorage.setItem('ecal_ver', CAL_VER);
-  } catch(e) {}
+function saveCAL(){
+  try{localStorage.setItem('ecal_data',JSON.stringify(CAL));localStorage.setItem('ecal_ver',CAL_VER);}catch(e){}
+}
+var CAL=loadCAL();
+var editMode=false;
+
+/* ═══════════════════════════════════════════
+   POPUP  — simple, direct, no delegation
+═══════════════════════════════════════════ */
+var gPopup=null;
+
+function destroyPopup(){
+  if(gPopup){gPopup.el.remove();gPopup=null;}
 }
 
-var CAL = loadCAL();
-var editMode = false;
-var popup = null;
+function openCellPopup(ds, pi, curVal, anchorEl){
+  destroyPopup();
 
-// ── EDIT MODE ──
-function toggleEdit() {
-  editMode = !editMode;
-  var btn = document.getElementById('editBtn');
-  btn.textContent = editMode ? '✅ Done editing' : '✏️ Edit calendar';
-  btn.classList.toggle('on', editMode);
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:9000;background:transparent;';
+  overlay.addEventListener('click',function(e){
+    if(!popupBox.contains(e.target)){destroyPopup();}
+  });
+
+  var popupBox=document.createElement('div');
+  popupBox.className='popup';
+  popupBox.style.cssText='position:fixed;z-index:9001;';
+
+  /* Title */
+  var title=document.createElement('div');
+  title.className='popup-title';
+  title.textContent=ds+' \u00B7 '+['Chris','Delphine','Emily','Jeremy'][pi];
+  popupBox.appendChild(title);
+
+  /* Pill buttons */
+  var pillsDiv=document.createElement('div');
+  pillsDiv.className='popup-pills';
+  ACTIVITIES.forEach(function(act){
+    var btn=document.createElement('button');
+    btn.className='pp'+(act.k===curVal?' sel':'');
+    btn.textContent=act.lbl;
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      applyEdit(ds,pi,act.k);
+    });
+    pillsDiv.appendChild(btn);
+  });
+  popupBox.appendChild(pillsDiv);
+
+  /* Custom input */
+  var customDiv=document.createElement('div');
+  customDiv.className='popup-custom';
+  var inp=document.createElement('input');
+  inp.className='pp-input';
+  inp.type='text';
+  inp.placeholder='Custom\u2026';
+  // Set custom value if current val is not in ACTIVITIES
+  var isKnown=ACTIVITIES.some(function(a){return a.k===curVal;});
+  inp.value=isKnown?'':curVal;
+  var applyBtn=document.createElement('button');
+  applyBtn.className='pp-apply';
+  applyBtn.textContent='Apply';
+  applyBtn.addEventListener('click',function(e){
+    e.stopPropagation();
+    applyEdit(ds,pi,inp.value.trim());
+  });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.stopPropagation();applyEdit(ds,pi,inp.value.trim());}
+    if(e.key==='Escape'){destroyPopup();}
+  });
+  customDiv.appendChild(inp);
+  customDiv.appendChild(applyBtn);
+  popupBox.appendChild(customDiv);
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(popupBox);
+  gPopup={el:overlay, box:popupBox};
+
+  /* Position below anchor */
+  var r=anchorEl.getBoundingClientRect();
+  var top=r.bottom+8;
+  var left=r.left;
+  var pw=300;
+  if(left+pw>window.innerWidth-8)left=window.innerWidth-pw-8;
+  if(top+350>window.innerHeight)top=r.top-360;
+  popupBox.style.top=top+'px';
+  popupBox.style.left=left+'px';
+  popupBox.style.width=pw+'px';
+}
+
+function applyEdit(ds,pi,val){
+  var row=CAL.find(function(r){return r[0]===ds;});
+  if(row){row[pi+1]=val;}
+  else{var nr=[ds,'','','',''];nr[pi+1]=val;CAL.push(nr);CAL.sort(function(a,b){return a[0]<b[0]?-1:1;});}
+  saveCAL();
+  destroyPopup();
   renderAll();
 }
-function resetCal() {
-  if (!confirm('Reset calendar to original? All changes will be lost.')) return;
-  CAL = DEFAULT_CAL.map(function(r){return r.slice();});
+
+/* ═══════════════════════════════════════════
+   EDIT MODE
+═══════════════════════════════════════════ */
+function toggleEdit(){
+  editMode=!editMode;
+  var btn=document.getElementById('editBtn');
+  btn.textContent=editMode?'\u2705 Done editing':'\u270F\uFE0F Edit calendar';
+  btn.classList.toggle('on',editMode);
+  destroyPopup();
+  renderAll();
+}
+function resetCal(){
+  if(!confirm('Reset to original? All changes will be lost.'))return;
+  CAL=DEFAULT_CAL.map(function(r){return r.slice();});
   saveCAL();
   renderAll();
 }
-function addRow() {
-  var d = document.getElementById('addDate').value;
-  if (!d) return;
-  if (!CAL.find(function(r){return r[0]===d;})) {
+function addRow(){
+  var d=document.getElementById('addDate').value;
+  if(!d)return;
+  if(!CAL.find(function(r){return r[0]===d;})){
     CAL.push([d,'','','','']);
     CAL.sort(function(a,b){return a[0]<b[0]?-1:1;});
-    saveCAL();
-    renderAll();
+    saveCAL();renderAll();
   }
-  document.getElementById('addDate').value = '';
+  document.getElementById('addDate').value='';
 }
-function delRow(ds) {
-  CAL = CAL.filter(function(r){return r[0]!==ds;});
-  saveCAL();
-  renderAll();
-}
-
-// ── POPUP ──
-function closePopup() {
-  if (popup) { popup.remove(); popup = null; }
-  document.removeEventListener('mousedown', onOutside);
-}
-function onOutside(e) {
-  if (popup && !popup.contains(e.target)) { closePopup(); }
-}
-function openPopup(ds, pi, cur, anchorEl) {
-  closePopup();
-  var p = document.createElement('div');
-  p.className = 'popup';
-  var pills = KNOWN.map(function(v) {
-    var lbl = v === '' ? '— empty —' : (PM[v] ? PM[v][1] : v);
-    return '<button class="pp'+(v===cur?' sel':'')+'" data-v="'+v+'">'+lbl+'</button>';
-  }).join('');
-  var custVal = KNOWN.indexOf(cur) >= 0 ? '' : (cur || '');
-  p.innerHTML = '<div class="popup-title">'+ds+' · '+['Chris','Delphine','Emily','Jeremy'][pi]+'</div>'
-    + '<div class="popup-pills">'+pills+'</div>'
-    + '<div class="popup-custom"><input class="pp-input" id="ppInp" placeholder="Custom…" value="'+custVal+'"><button class="pp-apply" id="ppApply">Apply</button></div>';
-  document.body.appendChild(p);
-  popup = p;
-  // Position
-  var r = anchorEl.getBoundingClientRect();
-  var top = r.bottom + window.scrollY + 6;
-  var left = r.left + window.scrollX;
-  if (left + 320 > window.innerWidth - 8) left = window.innerWidth - 328;
-  p.style.top = top + 'px';
-  p.style.left = left + 'px';
-  // Events
-  p.querySelectorAll('.pp').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      applyVal(ds, pi, btn.getAttribute('data-v'));
-    });
-  });
-  document.getElementById('ppApply').addEventListener('click', function(e) {
-    e.stopPropagation();
-    applyVal(ds, pi, document.getElementById('ppInp').value.trim());
-  });
-  document.getElementById('ppInp').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { applyVal(ds, pi, e.target.value.trim()); }
-    if (e.key === 'Escape') { closePopup(); }
-  });
-  setTimeout(function(){ document.addEventListener('mousedown', onOutside); }, 30);
-}
-function applyVal(ds, pi, val) {
-  var row = CAL.find(function(r){return r[0]===ds;});
-  if (row) { row[pi+1] = val; }
-  else { var nr=[ds,'','','','']; nr[pi+1]=val; CAL.push(nr); CAL.sort(function(a,b){return a[0]<b[0]?-1:1;}); }
-  saveCAL();
-  closePopup();
-  renderAll();
+function delRow(ds){
+  CAL=CAL.filter(function(r){return r[0]!==ds;});
+  saveCAL();renderAll();
 }
 
-// ── RENDER ──
-function pillHTML(v) {
-  if (!v || !v.trim()) return '';
-  if (PM[v]) return '<span class="pill '+PM[v][0]+'">'+PM[v][1]+'</span>';
-  return '<span class="pill p-custom">'+v+'</span>';
+/* ═══════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════ */
+function pillEl(v){
+  if(!v||!v.trim())return null;
+  var act=ACTIVITIES.find(function(a){return a.k===v;});
+  var sp=document.createElement('span');
+  sp.className='pill '+(act?act.cls:'p-custom');
+  sp.textContent=act?act.lbl:v;
+  return sp;
 }
-function renderAll() {
+
+function renderAll(){
   ['cal-jun','cal-jul','cal-aug'].forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.innerHTML = '';
+    var el=document.getElementById(id);if(el)el.innerHTML='';
   });
-  renderMonth('cal-jun',2026,6,'☀️  June 2026');
-  renderMonth('cal-jul',2026,7,'🌊  July 2026');
-  renderMonth('cal-aug',2026,8,'🍂  August 2026');
+  renderMonth('cal-jun',2026,6,'\u2600\uFE0F\u00A0 June 2026');
+  renderMonth('cal-jul',2026,7,'\uD83C\uDF0A\u00A0 July 2026');
+  renderMonth('cal-aug',2026,8,'\uD83C\uDF42\u00A0 August 2026');
 }
-function renderMonth(id, yr, mo, lbl) {
-  var rows = CAL.filter(function(r){
-    var d = new Date(r[0]); return d.getFullYear()===yr && d.getMonth()+1===mo;
+
+function renderMonth(id,yr,mo,lbl){
+  var rows=CAL.filter(function(r){var d=new Date(r[0]);return d.getFullYear()===yr&&d.getMonth()+1===mo;});
+  if(!rows.length&&!editMode)return;
+  var wrap=document.getElementById(id);
+
+  /* Block */
+  var blk=document.createElement('div');blk.className='cal-block';
+
+  /* Header */
+  var head=document.createElement('div');head.className='cal-head';
+  var mDiv=document.createElement('div');mDiv.className='cal-month';mDiv.textContent=lbl;
+  var cols=document.createElement('div');cols.className='cal-cols';
+  ['Date','Chris','Delphine','Emily','Jeremy'].forEach(function(n,i){
+    var ch=document.createElement('div');ch.className='cal-ch'+(i===0?' dc':'');ch.textContent=n;cols.appendChild(ch);
   });
-  if (!rows.length && !editMode) return;
-  var wrap = document.getElementById(id);
-  var blk = document.createElement('div');
-  blk.className = 'cal-block';
-  blk.innerHTML = '<div class="cal-head"><div class="cal-month">'+lbl+'</div>'
-    +'<div class="cal-cols"><div class="cal-ch dc">Date</div>'
-    +'<div class="cal-ch">Chris</div><div class="cal-ch">Delphine</div>'
-    +'<div class="cal-ch">Emily</div><div class="cal-ch">Jeremy</div></div></div>';
-  rows.forEach(function(r) {
-    var d = new Date(r[0]), dow = d.getDay(), we = dow===0||dow===6;
-    var row = document.createElement('div');
-    row.className = 'cal-row' + (we?' we':'');
-    var delBtnHtml = editMode
-      ? '<button class="del-btn" data-ds="'+r[0]+'" onclick="delRow(this.dataset.ds)">&#x2715;</button>'
-      : '';
-    var h = '<div class="cal-dc"><span class="cal-dn">'+d.getDate()+'</span>'
-      +'<span class="cal-dd">'+DAYS[dow]+'</span>'+delBtnHtml+'</div>';
-    [r[1],r[2],r[3],r[4]].forEach(function(val, i) {
-      var sv = (val||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-      if (editMode) {
-        h += '<div class="cal-cell edit-cell" data-ds="'+r[0]+'" data-pi="'+i+'" data-val="'+sv+'">'
-          + pillHTML(val) + '<span class="edit-hint">'+(val?'&#9998;':'&#65291;')+'</span></div>';
-      } else {
-        h += '<div class="cal-cell">'+pillHTML(val)+'</div>';
+  head.appendChild(mDiv);head.appendChild(cols);blk.appendChild(head);
+
+  /* Rows */
+  rows.forEach(function(r){
+    var d=new Date(r[0]),dow=d.getDay(),we=(dow===0||dow===6);
+    var row=document.createElement('div');row.className='cal-row'+(we?' we':'');
+
+    /* Date cell */
+    var dc=document.createElement('div');dc.className='cal-dc';
+    var dn=document.createElement('span');dn.className='cal-dn';dn.textContent=d.getDate();
+    var dd=document.createElement('span');dd.className='cal-dd';dd.textContent=DAYS[dow];
+    dc.appendChild(dn);dc.appendChild(dd);
+    if(editMode){
+      var db=document.createElement('button');db.className='del-btn';db.textContent='\u2715';
+      (function(ds){db.addEventListener('click',function(e){e.stopPropagation();delRow(ds);});})(r[0]);
+      dc.appendChild(db);
+    }
+    row.appendChild(dc);
+
+    /* Person cells — attach click directly */
+    [r[1],r[2],r[3],r[4]].forEach(function(val,i){
+      var cell=document.createElement('div');
+      cell.className='cal-cell'+(editMode?' edit-cell':'');
+      var p=pillEl(val);if(p)cell.appendChild(p);
+      if(editMode){
+        var hint=document.createElement('span');hint.className='edit-hint';hint.textContent=val?'\u270E':'\uFF0B';
+        cell.appendChild(hint);
+        /* Attach click directly — the cleanest possible approach */
+        (function(ds,pi,cv){
+          cell.addEventListener('click',function(e){
+            e.stopPropagation();
+            openCellPopup(ds,pi,cv,cell);
+          });
+        })(r[0],i,val||'');
       }
+      row.appendChild(cell);
     });
-    row.innerHTML = h;
     blk.appendChild(row);
   });
-  if (editMode) {
-    var ab = document.createElement('div');
-    ab.className = 'add-bar';
-    ab.innerHTML = '<span style="font-size:11px;font-weight:600;color:rgba(28,23,16,.4)">ADD ROW</span>'
-      + '<input id="addDate" type="date" min="2026-06-01" max="2026-08-31" class="date-inp">'
-      + '<button class="add-btn" onclick="addRow()">+ Add date</button>';
-    blk.appendChild(ab);
+
+  /* Add-row bar */
+  if(editMode){
+    var ab=document.createElement('div');ab.className='add-bar';
+    var sp=document.createElement('span');sp.style.cssText='font-size:11px;font-weight:600;color:rgba(28,23,16,.4)';sp.textContent='ADD ROW';
+    var di=document.createElement('input');di.id='addDate';di.type='date';di.min='2026-06-01';di.max='2026-08-31';di.className='date-inp';
+    var ab2=document.createElement('button');ab2.className='add-btn';ab2.textContent='+ Add date';ab2.addEventListener('click',addRow);
+    ab.appendChild(sp);ab.appendChild(di);ab.appendChild(ab2);blk.appendChild(ab);
   }
   wrap.appendChild(blk);
 }
 
-// Event delegation for edit cells — avoids all inline onclick quoting issues
-document.addEventListener('click', function(e) {
-  var t = e.target;
-  while (t && t !== document.body) {
-    if (t.classList && t.classList.contains('edit-cell') && editMode) {
-      openPopup(
-        t.getAttribute('data-ds'),
-        parseInt(t.getAttribute('data-pi'), 10),
-        t.getAttribute('data-val') || '',
-        t
-      );
-      return;
-    }
-    t = t.parentElement;
-  }
-});
-
-// Initial render
 renderAll();
 </script>
 </body>
